@@ -87,12 +87,18 @@ bool RS_Hatch::validate() {
         bool ret = true;
 
     // loops:
-		for(auto l: entities){
+		for(auto l: entities) {
 
         if (l->rtti()==RS2::EntityContainer) {
-            RS_EntityContainer* loop = (RS_EntityContainer*)l;
-
-            ret = loop->optimizeContours() && ret;
+            RS_EntityContainer* loop = static_cast<RS_EntityContainer*>(l);
+            bool optimizeOk(false);
+            if(loop) {
+               optimizeOk = loop->optimizeContours();
+            }
+            if(optimizeOk) { 
+               needOptimization = false;
+             }
+            ret = ret && optimizeOk;
         }
     }
 
