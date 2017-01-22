@@ -533,6 +533,7 @@ void RS_FilterDXFRW::addLWPolyline(const DRW_LWPolyline& data) {
                       // persist potentially existing polyline data
                       d.elevation=data.elevation;
                       d.thickness=data.thickness;
+                      d.consistwidth=data.width;
     RS_Polyline *polyline = new RS_Polyline(currentContainer, d);
     setEntityAttributes(polyline, &data);
 
@@ -2153,6 +2154,7 @@ void RS_FilterDXFRW::writeLWPolyline(RS_Polyline* l) {
     if (l) {
         pol.elevation=(l->getData()).elevation;
         pol.thickness=(l->getData()).thickness;
+        pol.width=(l->getData()).consistwidth;
     }
     
     for (RS_Entity* e=l->firstEntity(RS2::ResolveNone);

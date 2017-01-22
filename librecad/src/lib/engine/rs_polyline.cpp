@@ -39,7 +39,8 @@ RS_PolylineData::RS_PolylineData():
 	startpoint(false),
 	endpoint(false),
                 thickness(0.0),
-                elevation(0.0)
+                elevation(0.0),
+        consistwidth(0.0)
 {
 }
 
@@ -49,7 +50,8 @@ RS_PolylineData::RS_PolylineData(const RS_Vector& _startpoint,
 	startpoint(_startpoint),
 	endpoint(_endpoint),
                 thickness(0.0),
-                elevation(0.0)
+                elevation(0.0),
+        consistwidth(0.0)
 {
 
 	if (_closed) {
@@ -63,6 +65,7 @@ std::ostream& operator << (std::ostream& os,
 	"/" << pd.endpoint <<
                 ", thickness " << pd.thickness <<
                 ", elevation " << pd.elevation <<
+                ", consistwidth " << pd.consistwidth <<
 	")";
 	return os;
 }
