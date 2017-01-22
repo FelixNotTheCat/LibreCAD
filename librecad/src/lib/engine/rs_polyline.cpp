@@ -36,16 +36,20 @@
 #include "rs_information.h"
 
 RS_PolylineData::RS_PolylineData():
-	startpoint(false)
-	,endpoint(false)
+	startpoint(false),
+	endpoint(false),
+                thickness(0.0),
+                elevation(0.0)
 {
 }
 
 RS_PolylineData::RS_PolylineData(const RS_Vector& _startpoint,
 				const RS_Vector& _endpoint,
 				bool _closed):
-	startpoint(_startpoint)
-	,endpoint(_endpoint)
+	startpoint(_startpoint),
+	endpoint(_endpoint),
+                thickness(0.0),
+                elevation(0.0)
 {
 
 	if (_closed) {
@@ -57,6 +61,8 @@ std::ostream& operator << (std::ostream& os,
 								  const RS_PolylineData& pd) {
 	os << "(" << pd.startpoint <<
 	"/" << pd.endpoint <<
+                ", thickness " << pd.thickness <<
+                ", elevation " << pd.elevation <<
 	")";
 	return os;
 }
@@ -65,6 +71,7 @@ std::ostream& operator << (std::ostream& os,
  */
 RS_Polyline::RS_Polyline(RS_EntityContainer* parent)
 	:RS_EntityContainer(parent, true)
+                ,data()
 	,closingEntity(nullptr)
 	,nextBulge(0.)
 {

@@ -45,6 +45,9 @@ struct RS_PolylineData : public RS_Flags {
 
     RS_Vector startpoint;
     RS_Vector endpoint;
+    // persist potentially existing polyline data
+    double thickness;
+    double elevation;
 };
 
 std::ostream& operator << (std::ostream& os, const RS_PolylineData& pd);
