@@ -24,8 +24,8 @@
 **
 **********************************************************************/
 #include "qg_dlgoptionsdrawing.h"
+#include "qc_applicationwindow.h"
 
-#include <iostream>
 #include <cfloat>
 #include <QMessageBox>
 #include "rs_filterdxfrw.h"
@@ -74,9 +74,9 @@ QG_DlgOptionsDrawing::~QG_DlgOptionsDrawing()
         chType=RS2::RightCrosshair;
     }
     RS_SETTINGS->writeEntry("/CrosshairType", QString::number(static_cast<int>(chType)));
-	if(spacing->valid){
-		RS_SETTINGS->writeEntry("/GridSpacingX", spacing->x);
-		RS_SETTINGS->writeEntry("/GridSpacingY", spacing->y);
+    if(spacing->valid){
+        RS_SETTINGS->writeEntry("/GridSpacingX", spacing->x);
+        RS_SETTINGS->writeEntry("/GridSpacingY", spacing->y);
     }
     RS_SETTINGS->endGroup();
 }
@@ -91,15 +91,15 @@ void QG_DlgOptionsDrawing::languageChange()
 }
 
 void QG_DlgOptionsDrawing::init() {
-	graphic = nullptr;
+    graphic = nullptr;
 
     // precision list:
-	for (int i=0; i<=8; i++)
-		listPrec1 << QString("%1").arg(0.0,0,'f', i);
+    for (int i=0; i<=8; i++)
+        listPrec1 << QString("%1").arg(0.0,0,'f', i);
 
     // Main drawing unit:
     for (int i=RS2::None; i<RS2::LastUnit; i++) {
-		cbUnit->addItem(RS_Units::unitToString(static_cast<RS2::Unit>(i)));
+        cbUnit->addItem(RS_Units::unitToString(static_cast<RS2::Unit>(i)));
     }
 
     // init units combobox:
@@ -124,7 +124,7 @@ void QG_DlgOptionsDrawing::init() {
 
     // Paper format:
     for (int i=RS2::Custom; i<=RS2::NPageSize; i++) {
-		cbPaperFormat->addItem(RS_Units::paperFormatToString(static_cast<RS2::PaperFormat>(i)));
+        cbPaperFormat->addItem(RS_Units::paperFormatToString(static_cast<RS2::PaperFormat>(i)));
     }
     cbDimTxSty->init();
 }
@@ -137,7 +137,7 @@ void QG_DlgOptionsDrawing::setGraphic(RS_Graphic* g) {
     graphic = g;
 
 	if (graphic==nullptr) {
-		std::cout<<" QG_DlgOptionsDrawing::setGraphic(nullptr)\n";
+        RS_DEBUG->print(" QG_DlgOptionsDrawing::setGraphic(nullptr)\n");
         return;
     }
 
@@ -367,9 +367,14 @@ void QG_DlgOptionsDrawing::setGraphic(RS_Graphic* g) {
 
 
 /**
- * Called when OK is clicked.
+ * Called from on_buttonBox_clicked
  */
-void QG_DlgOptionsDrawing::validate() {
+bool QG_DlgOptionsDrawing::validate() {
+    // pre-conditions
+    if ( !graphic) {
+        return false;
+    }
+    RS_DEBUG->print(RS_Debug::D_NOTICE, "QG_DlgOptionsDrawing::isInches()");
     RS2::LinearFormat f = (RS2::LinearFormat)cbLengthFormat->currentIndex();
     if (f==RS2::Engineering || f==RS2::Architectural) {
         if (RS_Units::stringToUnit(cbUnit->currentText())!=RS2::Inch) {
@@ -378,143 +383,142 @@ void QG_DlgOptionsDrawing::validate() {
                                      "unit must be set to Inch."),
                                   QMessageBox::Ok,
                                   Qt::NoButton);
-            return;
+            return false;
         }
     }
+    
+    // units:
+            graphic->setUnit(static_cast<RS2::Unit>(cbUnit->currentIndex()));
 
-	if (graphic) {
-        // units:
-		graphic->setUnit(static_cast<RS2::Unit>(cbUnit->currentIndex()));
+    graphic->addVariable("$LUNITS", cbLengthFormat->currentIndex()+1, 70);
+    graphic->addVariable("$LUPREC", cbLengthPrecision->currentIndex(), 70);
+    graphic->addVariable("$AUNITS", cbAngleFormat->currentIndex(), 70);
+    graphic->addVariable("$AUPREC", cbAnglePrecision->currentIndex(), 70);
 
-        graphic->addVariable("$LUNITS", cbLengthFormat->currentIndex()+1, 70);
-        graphic->addVariable("$LUPREC", cbLengthPrecision->currentIndex(), 70);
-        graphic->addVariable("$AUNITS", cbAngleFormat->currentIndex(), 70);
-        graphic->addVariable("$AUPREC", cbAnglePrecision->currentIndex(), 70);
+    // paper:
+    graphic->setPaperFormat(
+                                    static_cast<RS2::PaperFormat>(cbPaperFormat->currentIndex()),
+                rbLandscape->isChecked());
+    // custom paper size:
+            if (static_cast<RS2::PaperFormat>(cbPaperFormat->currentIndex()) == RS2::Custom) {
+        graphic->setPaperSize(
+                    RS_Units::convert(
+                        RS_Vector(RS_Math::eval(lePaperWidth->text()),
+                                  RS_Math::eval(lePaperHeight->text())),
+                                                    static_cast<RS2::Unit>(cbUnit->currentIndex()),
+                                                    RS2::Millimeter)
+                                            );
+                    bool landscape;
+                    graphic->getPaperFormat(&landscape);
+                    rbLandscape->setChecked(landscape);
+    }
 
-        // paper:
-        graphic->setPaperFormat(
-					static_cast<RS2::PaperFormat>(cbPaperFormat->currentIndex()),
-                    rbLandscape->isChecked());
-        // custom paper size:
-		if (static_cast<RS2::PaperFormat>(cbPaperFormat->currentIndex()) == RS2::Custom) {
-            graphic->setPaperSize(
-                        RS_Units::convert(
-                            RS_Vector(RS_Math::eval(lePaperWidth->text()),
-                                      RS_Math::eval(lePaperHeight->text())),
-							static_cast<RS2::Unit>(cbUnit->currentIndex()),
-							RS2::Millimeter)
-						);
-			bool landscape;
-			graphic->getPaperFormat(&landscape);
-			rbLandscape->setChecked(landscape);
-        }
+    // grid:
+    //graphic->addVariable("$GRIDMODE", (int)cbGridOn->isChecked() , 70);
+    graphic->setGridOn(cbGridOn->isChecked());
+            *spacing=RS_Vector{0.0,0.0,0.0};
+    if (cbXSpacing->currentText()==tr("auto")) {
+                    spacing->x = 0.0;
+   } else {
+                    spacing->x = cbXSpacing->currentText().toDouble();
+    }
+    if (cbYSpacing->currentText()==tr("auto")) {
+                    spacing->y = 0.0;
+    } else {
+                    spacing->y = cbYSpacing->currentText().toDouble();
+    }
+            graphic->addVariable("$GRIDUNIT", *spacing, 10);
 
-        // grid:
-        //graphic->addVariable("$GRIDMODE", (int)cbGridOn->isChecked() , 70);
-        graphic->setGridOn(cbGridOn->isChecked());
-		*spacing=RS_Vector{0.0,0.0,0.0};
-        if (cbXSpacing->currentText()==tr("auto")) {
-			spacing->x = 0.0;
-        } else {
-			spacing->x = cbXSpacing->currentText().toDouble();
-        }
-        if (cbYSpacing->currentText()==tr("auto")) {
-			spacing->y = 0.0;
-        } else {
-			spacing->y = cbYSpacing->currentText().toDouble();
-        }
-		graphic->addVariable("$GRIDUNIT", *spacing, 10);
+    // dim:
+    bool ok1;
+    double oldValue=graphic->getVariableDouble("$DIMTXT",1.);
+            double newValue=RS_Math::eval(cbDimTextHeight->currentText(), &ok1);
+    //only update text height if a valid new position is specified, bug#3470605
+            if(ok1 && (fabs(oldValue-newValue)>RS_TOLERANCE)){
+        graphic->addVariable("$DIMTXT",newValue, 40);
+    }
+    graphic->addVariable("$DIMEXE",
+                         RS_Math::eval(cbDimExe->currentText()), 40);
+    graphic->addVariable("$DIMEXO",
+                         RS_Math::eval(cbDimExo->currentText()), 40);
+    bool ok2;
+    oldValue=graphic->getVariableDouble("$DIMGAP",1);
+    newValue=RS_Math::eval(cbDimGap->currentText(),&ok2);
+    //only update text position if a valid new position is specified, bug#3470605
+    ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
+    if(ok2){
+        graphic->addVariable("$DIMGAP",newValue , 40);
+    }
+    ok1 = ok1 || ok2;
+    oldValue=graphic->getVariableDouble("$DIMLFAC",1);
+    newValue=RS_Math::eval(cbDimFactor->currentText(),&ok2);
+            ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
+    ok1 = ok1 || ok2;
+    oldValue=graphic->getVariableDouble("$DIMSCALE",1);
+    newValue=RS_Math::eval(cbDimScale->currentText(),&ok2);
+            ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
+    ok1 = ok1 || ok2;
 
-        // dim:
-        bool ok1;
-        double oldValue=graphic->getVariableDouble("$DIMTXT",1.);
-		double newValue=RS_Math::eval(cbDimTextHeight->currentText(), &ok1);
-        //only update text height if a valid new position is specified, bug#3470605
-		if(ok1 && (fabs(oldValue-newValue)>RS_TOLERANCE)){
-            graphic->addVariable("$DIMTXT",newValue, 40);
-        }
-        graphic->addVariable("$DIMEXE",
-                             RS_Math::eval(cbDimExe->currentText()), 40);
-        graphic->addVariable("$DIMEXO",
-                             RS_Math::eval(cbDimExo->currentText()), 40);
-        bool ok2;
-        oldValue=graphic->getVariableDouble("$DIMGAP",1);
-        newValue=RS_Math::eval(cbDimGap->currentText(),&ok2);
-        //only update text position if a valid new position is specified, bug#3470605
-        ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
-        if(ok2){
-            graphic->addVariable("$DIMGAP",newValue , 40);
-        }
-        ok1 = ok1 || ok2;
-        oldValue=graphic->getVariableDouble("$DIMLFAC",1);
-        newValue=RS_Math::eval(cbDimFactor->currentText(),&ok2);
-		ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
-        ok1 = ok1 || ok2;
-        oldValue=graphic->getVariableDouble("$DIMSCALE",1);
-        newValue=RS_Math::eval(cbDimScale->currentText(),&ok2);
-		ok2 &= (fabs(oldValue-newValue)>RS_TOLERANCE);
-        ok1 = ok1 || ok2;
-
-        graphic->addVariable("$DIMASZ",
-                             RS_Math::eval(cbDimAsz->currentText()), 40);
-        //dimension tick size, 0 for no tick
-        graphic->addVariable("$DIMTSZ",
-                             RS_Math::eval(cbDimTsz->currentText()), 40);
-        //DIMTIH, dimension text, horizontal or aligned
-        int iOldIndex = graphic->getVariableInt("$DIMTIH",0);
-        int iNewIndex = cbDimTih->currentIndex();
-        if( iOldIndex != iNewIndex) {
-            ok1 = true;
-            graphic->addVariable("$DIMTIH", iNewIndex, 70);
-        }
-        //DIMLFAC, general factor for linear dimensions
-        double dimFactor = RS_Math::eval(cbDimFactor->currentText());
-        if( RS_TOLERANCE > fabs(dimFactor)) {
-            dimFactor = 1.0;
-        }
-        graphic->addVariable("$DIMLFAC", dimFactor, 40);
-        //DIMSCALE, general scale for dimensions
-        double dimScale = RS_Math::eval(cbDimScale->currentText());
-		if (dimScale <= DBL_EPSILON)
-            dimScale = 1.0;
-        graphic->addVariable("$DIMSCALE", dimScale, 40);
-        graphic->addVariable("$DIMLWD", cbDimLwD->getWidth(), 70);
-        graphic->addVariable("$DIMLWE", cbDimLwE->getWidth(), 70);
-        graphic->addVariable("$DIMFXL", cbDimFxL->value(), 40);
-        graphic->addVariable("$DIMFXLON", cbDimFxLon->isChecked()? 1:0, 70);
-        graphic->addVariable("$DIMLUNIT", cbDimLUnit->currentIndex()+1, 70);
-        graphic->addVariable("$DIMDEC", cbDimDec->currentIndex(), 70);
-        graphic->addVariable("$DIMZIN", cbDimZin->getData(), 70);
-        graphic->addVariable("$DIMAUNIT", cbDimAUnit->currentIndex(), 70);
-        graphic->addVariable("$DIMADEC", cbDimADec->currentIndex(), 70);
+    graphic->addVariable("$DIMASZ",
+                         RS_Math::eval(cbDimAsz->currentText()), 40);
+    //dimension tick size, 0 for no tick
+    graphic->addVariable("$DIMTSZ",
+                         RS_Math::eval(cbDimTsz->currentText()), 40);
+    //DIMTIH, dimension text, horizontal or aligned
+    int iOldIndex = graphic->getVariableInt("$DIMTIH",0);
+    int iNewIndex = cbDimTih->currentIndex();
+    if( iOldIndex != iNewIndex) {
+        ok1 = true;
+        graphic->addVariable("$DIMTIH", iNewIndex, 70);
+    }
+    //DIMLFAC, general factor for linear dimensions
+    double dimFactor = RS_Math::eval(cbDimFactor->currentText());
+    if( RS_TOLERANCE > fabs(dimFactor)) {
+        dimFactor = 1.0;
+    }
+    graphic->addVariable("$DIMLFAC", dimFactor, 40);
+    //DIMSCALE, general scale for dimensions
+    double dimScale = RS_Math::eval(cbDimScale->currentText());
+            if (dimScale <= DBL_EPSILON)
+        dimScale = 1.0;
+    graphic->addVariable("$DIMSCALE", dimScale, 40);
+    graphic->addVariable("$DIMLWD", cbDimLwD->getWidth(), 70);
+    graphic->addVariable("$DIMLWE", cbDimLwE->getWidth(), 70);
+    graphic->addVariable("$DIMFXL", cbDimFxL->value(), 40);
+    graphic->addVariable("$DIMFXLON", cbDimFxLon->isChecked()? 1:0, 70);
+    graphic->addVariable("$DIMLUNIT", cbDimLUnit->currentIndex()+1, 70);
+    graphic->addVariable("$DIMDEC", cbDimDec->currentIndex(), 70);
+    graphic->addVariable("$DIMZIN", cbDimZin->getData(), 70);
+    graphic->addVariable("$DIMAUNIT", cbDimAUnit->currentIndex(), 70);
+    graphic->addVariable("$DIMADEC", cbDimADec->currentIndex(), 70);
 //        graphic->addVariable("$DIMAZIN", cbDimAZin->currentIndex(), 70);
-        graphic->addVariable("$DIMAZIN", cbDimAZin->getData(), 70);
-        int colNum, colRGB;
-        colNum = RS_FilterDXFRW::colorToNumber(cbDimClrD->getColor(), &colRGB);
-        graphic->addVariable("$DIMCLRD", colNum, 70);
-        colNum = RS_FilterDXFRW::colorToNumber(cbDimClrE->getColor(), &colRGB);
-        graphic->addVariable("$DIMCLRE", colNum, 70);
-        colNum = RS_FilterDXFRW::colorToNumber(cbDimClrT->getColor(), &colRGB);
-        graphic->addVariable("$DIMCLRT", colNum, 70);
-		if (cbDimTxSty->getFont())
-			graphic->addVariable("$DIMTXSTY", cbDimTxSty->getFont()->getFileName() , 2);
-        graphic->addVariable("$DIMDSEP", (cbDimDSep->currentIndex()==1)? 44 : 0, 70);
+    graphic->addVariable("$DIMAZIN", cbDimAZin->getData(), 70);
+    int colNum, colRGB;
+    colNum = RS_FilterDXFRW::colorToNumber(cbDimClrD->getColor(), &colRGB);
+    graphic->addVariable("$DIMCLRD", colNum, 70);
+    colNum = RS_FilterDXFRW::colorToNumber(cbDimClrE->getColor(), &colRGB);
+    graphic->addVariable("$DIMCLRE", colNum, 70);
+    colNum = RS_FilterDXFRW::colorToNumber(cbDimClrT->getColor(), &colRGB);
+    graphic->addVariable("$DIMCLRT", colNum, 70);
+            if (cbDimTxSty->getFont())
+                    graphic->addVariable("$DIMTXSTY", cbDimTxSty->getFont()->getFileName() , 2);
+    graphic->addVariable("$DIMDSEP", (cbDimDSep->currentIndex()==1)? 44 : 0, 70);
 
-        // splines:
-        graphic->addVariable("$SPLINESEGS",
-                             (int)RS_Math::eval(cbSplineSegs->currentText()), 70);
+    // splines:
+    graphic->addVariable("$SPLINESEGS",
+                         (int)RS_Math::eval(cbSplineSegs->currentText()), 70);
 
-        RS_DEBUG->print("QG_DlgOptionsDrawing::validate: splinesegs is: %s",
-                        cbSplineSegs->currentText().toLatin1().data());
+    RS_DEBUG->print("QG_DlgOptionsDrawing::validate: splinesegs is: %s",
+                    cbSplineSegs->currentText().toLatin1().data());
 
-        // update all dimension and spline entities in the graphic to match the new settings:
-        // update text position when text height or text gap changed
-        graphic->updateDimensions(ok1);
-        graphic->updateSplines();
+    // update all dimension and spline entities in the graphic to match the new settings:
+    // update text position when text height or text gap changed
+    graphic->updateDimensions(ok1);
+    graphic->updateSplines();
 
-        graphic->setModified(true);
-    }
-    accept();
+    graphic->setModified(true);
+    
+    return true;
 }
 
 /**
@@ -841,6 +845,46 @@ void QG_DlgOptionsDrawing::on_cbDimFxLon_toggled(bool checked)
 void QG_DlgOptionsDrawing::on_tabWidget_currentChanged(int index)
 {
     current_tab = index;
+}
+
+/**
+ * Slot for buttonbox signals (ok/cancel/apply)
+ */
+void QG_DlgOptionsDrawing::on_buttonBox_clicked(QAbstractButton *pbutton)
+{
+    RS_DEBUG->print(RS_Debug::D_DEBUGGING, "Buttonbox ok/cancel/apply button caught");
+    // which dialog button
+    auto button = buttonBox->standardButton(pbutton);
+    switch (button) {
+    case QDialogButtonBox::Ok:
+        if ( validate() ) {
+            RS_DEBUG->print(RS_Debug::D_DEBUGGING, "QG_DlgOptionsDrawing valid && ok");
+            accept();
+        }
+        break;
+    case QDialogButtonBox::Cancel:
+        RS_DEBUG->print(RS_Debug::D_DEBUGGING, "QG_DlgOptionsDrawing cancel");
+        reject();
+        break;
+    case QDialogButtonBox::Apply:
+        if ( validate() ) {
+            RS_DEBUG->print(RS_Debug::D_DEBUGGING, "QG_DlgOptionsDrawing valid");
+            //  keep dialog, update drawing
+            QC_ApplicationWindow * paw = QC_ApplicationWindow::getAppWindow();
+            if( paw ) {
+                RS_DEBUG->print(RS_Debug::D_DEBUGGING, "Apply: QC_ApplicationWindow::redrawAll()");
+                paw->redrawAll();
+            }
+            else {
+                RS_DEBUG->print(RS_Debug::D_ERROR, "Failed to get QC_ApplicationWindow*");
+            }
+        }
+        break;
+    default:
+        // button signal not recognised
+        RS_DEBUG->print(RS_Debug::D_ERROR, "Buttonbox vs button mismatch");
+        break;
+    }
 }
 
 //EOF

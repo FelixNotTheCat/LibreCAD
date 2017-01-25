@@ -42,7 +42,6 @@ public:
 
 public slots:
     virtual void setGraphic( RS_Graphic * g );
-    virtual void validate();
     virtual void updateLengthPrecision();
     virtual void updateAnglePrecision();
     virtual void updatePreview();
@@ -73,9 +72,12 @@ private slots:
 
     void on_tabWidget_currentChanged(int index);
 
+    void on_buttonBox_clicked(QAbstractButton *);
+
 private:
     void updateCBLengthPrecision(QComboBox* u, QComboBox* l);
     void updateCBAnglePrecision(QComboBox* u, QComboBox* p);
+    bool validate();
 
 private:
     QStringList listPrec1;

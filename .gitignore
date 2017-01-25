@@ -22,6 +22,9 @@ custom.*
 # Unix generated directories (except Apple)
 unix/
 
+# Netbeans generated project directories
+nbproject/
+
 # Win/MSVC generated files and binaries
 windows/
 release/
